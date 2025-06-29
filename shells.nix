@@ -24,6 +24,7 @@
       ll = "eza -la --icons";
       la = "eza -a --icons";
       lt = "eza --tree --icons";
+      lg = "lazygit";
       dots = "cd ~/.config";
       goodwork = "cd ~/goodwork";
       nixi = "sudo nix run nix-darwin -- switch --flake ~/.config";

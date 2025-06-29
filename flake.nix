@@ -9,7 +9,6 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,148 +30,140 @@
   };
 
   outputs =
-    inputs@{ self
-    , nix-darwin
-    , nixpkgs
-    , home-manager
-    , nixvim
-    , nix-homebrew
-    , homebrew-core
-    , homebrew-cask
-    , homebrew-bundle
+    inputs@{
+      self,
+      nix-darwin,
+      nixpkgs,
+      home-manager,
+      ...
     }:
     let
+      # Define the username for easy reuse.
       username = "rr";
-      configuration = { pkgs, ... }: {
-        system.primaryUser = "rr";
 
-        environment.systemPackages = [ ];
+      # Common configuration shared across all hosts.
+      # Host-specific settings, like homebrew packages, have been removed.
+      commonConfiguration =
+        { pkgs, ... }:
+        {
+          system.primaryUser = username;
 
-        nix.settings.experimental-features = "nix-command flakes";
+          environment.systemPackages = [ ];
 
-        users.users.${username} = {
-          name = username;
-          home = "/Users/${username}";
-        };
+          nix.settings.experimental-features = "nix-command flakes";
 
-        # Home Manager configuration for the user.
-        home-manager.users.${username} = { pkgs, ... }: {
-
-          imports = [
-            # Import the nixvim module
-            nixvim.homeManagerModules.nixvim
-            # Import your custom nixvim configuration
-            ./nixvim
-
-            ./shells.nix
-            ./evil-helix.nix
-          ];
-
-          home.stateVersion = "23.11";
-          nixpkgs.config.allowUnfree = true;
-          # Enable custom fonts
-          fonts.fontconfig.enable = true;
-
-          # User-specific packages are managed here.
-          # The shell tools have been moved to shells.nix
-          home.packages = [
-            pkgs.git
-
-            # apps
-            # pkgs.vim # <<< REMOVE THIS, nixvim provides Neovim >>>
-            pkgs.httpie
-            pkgs.qmk
-            pkgs.lazygit
-            pkgs.warp-terminal
-
-            # lang stuff
-            pkgs.deno
-            pkgs.go
-            pkgs.gopls
-            pkgs.golangci-lint
-            pkgs.tailwindcss
-          ];
-
-          programs.git = {
-            enable = true;
-            userName = "rsbear";
-            userEmail = "hellorosss@gmail.com";
-            extraConfig = {
-              init.defaultBranch = "main";
-              # <<< CHANGE THIS TO USE THE NIXVIM-PROVIDED EDITOR >>>
-              core.editor = "${pkgs.neovim}/bin/nvim";
-              pull.rebase = true;
-            };
+          users.users.${username} = {
+            name = username;
+            home = "/Users/${username}";
           };
 
-          programs.ssh = {
-            enable = true;
-            matchBlocks = {
-              "github.com" = {
-                user = "git";
-                identityFile = "/Users/${username}/.ssh/id_ed25519_github";
+          # Home Manager configuration for the user.
+          home-manager.users.${username} =
+            { pkgs, ... }:
+            {
+              imports = [
+                # Import the nixvim module
+                inputs.nixvim.homeManagerModules.nixvim
+                # Import your custom nixvim, shells, and other configs
+                ./nixvim
+                ./shells.nix
+                ./evil-helix.nix
+              ];
+
+              home.stateVersion = "23.11";
+              nixpkgs.config.allowUnfree = true;
+              fonts.fontconfig.enable = true;
+
+              # User-specific packages are managed here.
+              home.packages = with pkgs; [
+                git
+                httpie
+                qmk
+                lazygit
+                warp-terminal
+                # lang stuff
+                deno
+                go
+                gopls
+                golangci-lint
+                tailwindcss
+              ];
+
+              programs.git = {
+                enable = true;
+                userName = "rsbear";
+                userEmail = "hellorosss@gmail.com";
+                extraConfig = {
+                  init.defaultBranch = "main";
+                  core.editor = "${pkgs.neovim}/bin/nvim";
+                  pull.rebase = true;
+                };
+              };
+
+              programs.ssh = {
+                enable = true;
+                matchBlocks = {
+                  "github.com" = {
+                    user = "git";
+                    identityFile = "/Users/${username}/.ssh/id_ed25519_github";
+                  };
+                };
               };
             };
+
+          services.karabiner-elements = {
+            enable = true;
+            package = pkgs.karabiner-elements.overrideAttrs (old: {
+              version = "14.13.0";
+              src = pkgs.fetchurl {
+                inherit (old.src) url;
+                hash = "sha256-gmJwoht/Tfm5qMecmq1N6PSAIfWOqsvuHU8VDJY8bLw=";
+              };
+              dontFixup = true;
+            });
           };
 
-        };
-
-        services.karabiner-elements = {
-          enable = true;
-          package = pkgs.karabiner-elements.overrideAttrs (old: {
-            version = "14.13.0";
-            src = pkgs.fetchurl {
-              inherit (old.src) url;
-              hash = "sha256-gmJwoht/Tfm5qMecmq1N6PSAIfWOqsvuHU8VDJY8bLw=";
+          system.defaults = {
+            NSGlobalDomain = {
+              InitialKeyRepeat = 10;
+              KeyRepeat = 1;
             };
-            dontFixup = true;
-          });
-        };
-
-        homebrew.enable = true;
-        homebrew.casks = [
-          "ghostty"
-        ];
-        homebrew.brews = [ ];
-
-        system.defaults = {
-          NSGlobalDomain = {
-            InitialKeyRepeat = 10;
-            KeyRepeat = 1;
+            finder.AppleShowAllExtensions = true;
           };
-          finder.AppleShowAllExtensions = true;
-        };
-        system.keyboard = {
-          enableKeyMapping = true;
-        };
+          system.keyboard.enableKeyMapping = true;
 
-        system.configurationRevision = self.rev or self.dirtyRev or null;
-        system.stateVersion = 5;
-        nixpkgs.hostPlatform = "aarch64-darwin";
-      };
+          system.configurationRevision = self.rev or self.dirtyRev or null;
+          system.stateVersion = 5;
+          nixpkgs.hostPlatform = "aarch64-darwin";
+        };
     in
     {
       darwinConfigurations."Rosss-MacBook-Pro" = nix-darwin.lib.darwinSystem {
+        # Pass flake inputs to all modules automatically.
+        specialArgs = { inherit inputs; };
         modules = [
-          configuration
+          # 1. Import the common configuration for all hosts.
+          commonConfiguration
+
+          # 2. Import Home Manager for darwin.
           home-manager.darwinModules.home-manager
-          nix-homebrew.darwinModules.nix-homebrew
+
+          # 3. Import the new, centralized homebrew configuration.
+          ./homebrew.nix
+
+          # 4. Define host-specific settings, like which Homebrew packages to install.
           {
-            nix-homebrew = {
-              enable = true;
-              enableRosetta = true;
-              user = "rr";
-              taps = {
-                "homebrew/homebrew-bundle" = homebrew-bundle;
-                "homebrew/homebrew-core" = homebrew-core;
-                "homebrew/homebrew-cask" = homebrew-cask;
-              };
-              mutableTaps = false;
-            };
+            homebrew.casks = [
+              "ghostty"
+            ];
+            homebrew.brews = [
+              # You can add command-line tools here, e.g., "jq"
+            ];
           }
         ];
       };
 
+      # Formatter for the project.
       formatter.aarch64-darwin = nixpkgs.legacyPackages.aarch64-darwin.nixpkgs-fmt;
     };
 }
